@@ -1,0 +1,23 @@
+{
+  "name": "atiwva",
+  "version": "1.0.0",
+  "description": "ATIW Voice Assistant",
+  "main": "atiwva.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cptniglo/atiwva.git"
+  },
+  "author": "Simon Schwab Marino",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cptniglo/atiwva/issues"
+  },
+  "homepage": "https://github.com/cptniglo/atiwva#readme",
+  "dependencies": {
+    "actions-on-google": "^1.8.0",
+    "mysql": "^2.15.0"
+  }
+}
