@@ -12,14 +12,14 @@ app.set('port', (process.env.PORT || 8080));
 app.use(express.json({type: 'application/json'}));
 
 var con = mysql.createConnection({
-	host: "192.168.2.32",
-	user: "db_1",
-	password: "passwort"
+	host: '192.168.2.32',
+	user: 'db_1',
+	password: 'passwort'
 });
 
 con.connect(function(err) {
 	if (err) throw err;
-	console.log("Connected!");
+	console.log('Connected!');
 });
 
 const GET_LESSON_AT_TIME_ACTION = 'get_lesson_at_time';
@@ -35,13 +35,17 @@ app.post('/', function (request, response) {
 	}
 
 	function queryLessonsAtTime(date, hour) {
-
+		con.query('SELECT * FROM Fach', function (err, result, fields) {
+			if (err) throw err;
+			console.log('Ergebnis ' + result)
+		})
 	}
 
 	function getLessonAtTime(app) {
 		console.log('Fetching lessons...');
-		let number = parseInt(app.getArgument('number'));
-		var answer = squareNumber(number);
+		let date = Date.parse(app.getArgument('date'));
+		let hour = parseInt(app.getArgument('hour'));
+		var answer = queryLessonsAtTime(date, hour);
 		app.data.answer = answer;
 		app.ask('Die Antwort ist ' + answer);
 	}
