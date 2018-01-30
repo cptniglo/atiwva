@@ -14,13 +14,16 @@ app.use(express.json({type: 'application/json'}));
 var con = mysql.createConnection({
 	host: '192.168.2.32',
 	user: 'db_1',
-	password: 'passwort'
+	password: 'passwort',
+	database: 'smatiw1'
 });
 
 con.connect(function(err) {
 	if (err) throw err;
 	console.log('Connected!');
 });
+
+var classId = '1';
 
 const GET_LESSON_AT_TIME_ACTION = 'get_lesson_at_time';
 
@@ -30,28 +33,44 @@ app.post('/', function (request, response) {
 
 	const app = new App({request: request, response: response});
 
-	function squareNumber(num) {
-		return Math.pow(num, 2);
+	function getWeekday(date) {
+		var weekday = new Array(7);
+		weekday[0] = 'Sonntag';
+		weekday[1] = 'Montag';
+		weekday[2] = 'Dienstag';
+		weekday[3] = 'Mittwoch';
+		weekday[4] = 'Donnerstag';
+		weekday[5] = 'Freitag';
+		weekday[6] = 'Samstag';
+	
+		return weekday[date.getDay()];
 	}
 
-	function queryLessonsAtTime(date, hour) {
-		con.query('SELECT * FROM Fach', function (err, result, fields) {
+	function queryLessonsAtTime(resolve, weekday, block) {
+		con.query(`SELECT Fach_Kuerzel FROM Fach WHERE Fach_ID = (SELECT Fach_ID FROM Klasse_Zeitpunkt WHERE Klasse_ID = "${classId}" AND Zeitpunkt_ID = (SELECT Zeitpunkt_ID FROM Zeitpunkt WHERE Zeitpunkt_Tag = "${weekday}" AND Zeitpunkt_Block = "${block}"))`, function (err, result, fields) {
 			if (err) throw err;
-			console.log('Ergebnis ' + result)
-		})
+			let resVal = result[0].Fach_Kuerzel;	
+			console.log('Das Ergebnis ist: ' + resVal);
+			resolve(resVal);
+		});
 	}
 
 	function getLessonAtTime(app) {
 		console.log('Fetching lessons...');
-		let date = Date.parse(app.getArgument('date'));
+		let date = new Date(app.getArgument('date'));
+		let weekday = getWeekday(date);
 		let hour = parseInt(app.getArgument('hour'));
-		var answer = queryLessonsAtTime(date, hour);
-		app.data.answer = answer;
-		app.ask('Die Antwort ist ' + answer);
+		var answer = new Promise((resolve, rejecet) => {
+			queryLessonsAtTime(resolve, weekday, hour);
+		});
+		answer.then((value) => {
+			app.data.answer = value;
+			app.ask('Die Antwort ist ' + value);
+		});
 	}
 
 	let actionMap = new Map();
-	actionMap.set(SQUARE_NUMBER_ACTION, test);
+	actionMap.set(GET_LESSON_AT_TIME_ACTION, getLessonAtTime);
 
 	app.handleRequest(actionMap);
 });
