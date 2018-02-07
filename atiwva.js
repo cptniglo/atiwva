@@ -19,13 +19,14 @@ var con = mysql.createConnection({
 });
 
 con.connect(function(err) {
-	if (err) throw err;
+	if (err) throw err; // Missing exception handling
 	console.log('Connected!');
 });
 
+// Set default class id
 var classId = '1';
 
-const GET_LESSON_AT_TIME_ACTION = 'get_lesson_at_time';
+const GET_LESSON_AT_TIME_ACTION = 'get_lesson_at_time_action';
 
 app.post('/', function (request, response) {
 	console.log('headers: ' + JSON.stringify(request.headers));
@@ -50,7 +51,7 @@ app.post('/', function (request, response) {
 		var ordinal = new Array(10);
 		ordinal[0] = 'ersten';
 		ordinal[1] = 'zweiten';
-		ordinal[2] = 'ditten';
+		ordinal[2] = 'dritten';
 		ordinal[3] = 'vierten';
 		ordinal[4] = 'fünften';
 		ordinal[5] = 'sechsten';
@@ -62,29 +63,63 @@ app.post('/', function (request, response) {
 		return ordinal[num - 1];
 	}
 
-	function queryDatabase(sql, resolve, reject) {
-		con.query(sql, (err, result, fields) => {
-			if (err) reject();
-			resolve(result);
+	function queryDatabase(sql) {
+		return new Promise((resolve, reject) => {
+			con.query(sql, (err, result, fields) => {
+				if (err) reject(); // Missing rejection catch
+				resolve(result);
+			});
 		});
 	}
 
-	// Get lessons at time
+	// Get lesson at time action handler
 	function getLessonAtTime(app) {
-		console.log('Fetching lessons...');
-		let date = new Date(app.getArgument('date'));
-		let weekday = getWeekday(date);
-		let block = parseInt(app.getArgument('hour'));
-		let sql = `SELECT Fach_Kuerzel FROM Fach WHERE Fach_ID = 
+		console.log('>>log: getLessonAtTime() fired')
+		var date = new Date(app.getArgument('date'));
+		var weekday = getWeekday(date);
+		var block = parseInt(app.getArgument('block'));
+		if (isNaN(block)) {
+			console.log('>>log: block is null');
+			getLessonsOnDay(app, weekday);
+		}
+		else {
+			console.log('>>log: block is not null');
+			getLessonOnDayInBlock(app, weekday, block);
+		}
+	}
+
+	function getLessonsOnDay(app, weekday) {
+		console.log('>>log: fetching lessons...');
+		var sql = `SELECT * 
+		FROM (SELECT kz1.Klasse_ID, kz1.Zeitpunkt_ID, kz1.Fach_ID, f1.Fach_Bezeichnung 
+		FROM Klasse_Zeitpunkt kz1 LEFT JOIN Fach f1 ON kz1.Fach_ID = f1.Fach_ID 
+		UNION 
+		SELECT kz2.Klasse_ID, kz2.Zeitpunkt_ID, kz2.Fach_ID, f2.Fach_Bezeichnung 
+		FROM Klasse_Zeitpunkt kz2 RIGHT JOIN Fach f2 ON kz2.Fach_ID = f2.Fach_ID) kzn 
+		WHERE kzn.Klasse_ID = "${classId}" AND kzn.Zeitpunkt_ID IN 
+		(SELECT z.Zeitpunkt_ID FROM Zeitpunkt z WHERE z.Zeitpunkt_Tag = "${weekday}") 
+		ORDER BY kzn.Zeitpunkt_ID`;
+		var promise = queryDatabase(sql);
+		promise.then((result) => {
+			var lessons = new Array();
+			for (var i = 0; i < result.length; i++) {
+				lessons.push(result[i].Fach_Bezeichnung);
+			}
+			var lessonsStr = lessons.join(', ');
+			app.data.answer = lessonsStr;
+			app.ask('Am ' + weekday + ' habt ihr folgende Fächer: ' + lessonsStr);
+		});
+	}
+
+	function getLessonOnDayInBlock(app, weekday, block) {
+		console.log('>>log: fetching lesson...');
+		var sql = `SELECT Fach_Bezeichnung FROM Fach WHERE Fach_ID = 
 		(SELECT Fach_ID FROM Klasse_Zeitpunkt WHERE Klasse_ID = "${classId}" AND Zeitpunkt_ID = 
 		(SELECT Zeitpunkt_ID FROM Zeitpunkt WHERE Zeitpunkt_Tag = "${weekday}" AND Zeitpunkt_Block = "${block}"))`;
-		var answer = new Promise((resolve, rejecet) => {
-			queryDatabase(sql, resolve, reject);
-		});
-		answer.then((result) => {
-			let resVal = result[0].Fach_Kuerzel
-			app.data.answer = resVal;
-			app.ask('Am ' + weekday + ' in der ' + getOrdinal(block) + ' Stunde habt ihr ' + resVal);
+		var promise = queryDatabase(sql);
+		promise.then((result) => {
+			app.data.answer = result[0].Fach_Bezeichnung;
+			app.ask('Am ' + weekday + ' in der ' + getOrdinal(block) + ' Stunde habt ihr ' + result[0].Fach_Bezeichnung);
 		});
 	}
 
